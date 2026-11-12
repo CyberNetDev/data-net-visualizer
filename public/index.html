@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Net Visualizer</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="vendor/leaflet.min.css">
+  <script src="vendor/echarts.min.js"></script>
+  <script src="vendor/leaflet.min.js"></script>
+</head>
+<body>
+  <!-- ======================= Connexion ======================= -->
+  <section id="login" class="login" hidden>
+  <div class="login-wrap">
+    <div class="intro">
+      <div class="intro-brand"><span class="logo">◧</span> Data Net Visualizer</div>
+      <h1>Vos données de collecte en graphiques, tableaux et cartes, en quelques clics.</h1>
+      <p class="intro-lead">Data Net Visualizer lit directement vos données <b>ODK Central</b>, <b>IASO</b> (Bluesquare), <b>CommCare</b>, <b>DHIS2</b> ou <b>mSupply</b> (formulaires, programmes, données agrégées, stock et distributions) et les transforme en visualisations, sans export Excel ni code. Le principe est celui du <i>Data Visualizer</i> de DHIS2 : vous glissez des champs, vous choisissez un type de graphique, vous enregistrez et partagez.</p>
+      <ul class="intro-features">
+        <li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></span><div><b>23 types de visualisation</b><span>Colonnes, courbes, tableaux croisés, Sankey, treemap, jauges, calendrier…</span></div></li>
+        <li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></span><div><b>Cartes et hiérarchie</b><span>Les points GPS sur une carte ; avec IASO et DHIS2, les résultats par région, district ou formation sanitaire.</span></div></li>
+        <li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span><div><b>Les libellés de vos formulaires</b><span>Questions et choix du XLSForm, dans toutes ses langues, répétitions comprises.</span></div></li>
+        <li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h-2a3 3 0 0 0-3 3v13M7 11h7M14 14l6 6M20 14l-6 6"/></svg></span><div><b>Champs calculés et regroupements</b><span>Classes d'âge, formules, durées, recodages… sans modifier le formulaire.</span></div></li>
+        <li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span><div><b>Rapide, même pour les gros formulaires</b><span>Seules les nouvelles soumissions sont téléchargées à chaque mise à jour.</span></div></li>
+        <li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><div><b>Vos droits sont respectés</b><span>Chacun se connecte avec son propre compte et ne voit que ce qu'il est autorisé à voir.</span></div></li>
+      </ul>
+      <div class="intro-steps">
+        <b>Comment ça marche ?</b>
+        <ol><li>Choisissez votre plateforme et connectez-vous avec votre compte</li><li>Choisissez un projet et un formulaire</li><li>Glissez des champs en <i>Lignes</i> et <i>Colonnes</i>, choisissez un graphique</li></ol>
+      </div>
+      <div class="intro-links">
+        <a class="intro-jump" href="#loginForm">Se connecter ↓</a>
+        <a class="intro-help" href="aide.html" target="_blank" rel="noopener">Lire le guide d'utilisation →</a>
+      </div>
+    </div>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <div class="login-brand">Connexion</div>
+      <div id="platformTabs" class="platform-tabs" role="radiogroup" aria-label="Plateforme de collecte" hidden></div>
+      <p class="login-sub" id="loginSub">Connectez-vous avec votre compte <b>ODK Central</b>. Vous verrez uniquement les projets auxquels votre compte a accès.</p>
+      <p id="loginMsg" class="login-msg" hidden></p>
+
+      <label id="serverWrap"><span id="serverLabel">Serveur ODK Central</span>
+        <input id="loginServer" name="server" type="text" inputmode="url" list="recentServers" placeholder="https://central.monorg.org" autocomplete="url" required>
+        <datalist id="recentServers"></datalist>
+        <small id="serverHelp">L'adresse que vous utilisez pour ouvrir ODK Central dans le navigateur.</small>
+      </label>
+      <div id="serverLocked" class="locked" hidden></div>
+
+      <label><span id="userLabel">E-mail</span>
+        <input id="loginEmail" name="email" type="email" autocomplete="username" required>
+      </label>
+      <label><span id="pwLabel">Mot de passe</span>
+        <span class="pw">
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" id="togglePw" class="link" aria-label="Afficher le mot de passe">Afficher</button>
+        </span>
+        <small id="pwHelp" hidden></small>
+      </label>
+      <label class="check"><input type="checkbox" id="rememberServer" checked> <span id="rememberLabel">Mémoriser ce serveur et cet e-mail sur cet appareil</span></label>
+
+      <button type="submit" id="loginBtn" class="primary">Se connecter</button>
+      <button type="button" id="demoBtn" class="ghost wide">Essayer avec des données de démonstration</button>
+      <p class="login-foot"><span id="loginFoot">Le mot de passe est transmis uniquement à votre serveur ODK Central et n'est jamais enregistré.</span><br><a href="aide.html#connexion" target="_blank" rel="noopener">Besoin d'aide pour vous connecter ?</a></p>
+    </form>
+  </div>
+  </section>
+
+  <!-- ======================= Application ======================= -->
+  <div id="appRoot" class="root" hidden>
+  <header class="topbar">
+    <button id="btnSidebar" class="icon-btn" type="button" aria-controls="sidebar" aria-expanded="true" title="Masquer le panneau latéral (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="sr">Masquer ou afficher le panneau latéral</span></button>
+    <div class="brand"><span class="logo">◧</span> Data Net Visualizer <span id="demoBadge" class="badge" hidden>DÉMO</span></div>
+    <div class="vistype">
+      <label for="visType" class="sr">Type de visualisation</label>
+      <select id="visType" title="✦ = type inspiré d'Apache Superset"></select>
+    </div>
+    <div class="actions">
+      <button id="btnNew" class="ghost">Nouveau</button>
+      <button id="btnOpen" class="ghost">Ouvrir</button>
+      <button id="btnSave" class="ghost">Enregistrer</button>
+      <button id="btnSaveAs" class="ghost">Enregistrer sous…</button>
+      <div class="menu">
+        <button id="btnDownload" class="ghost">Télécharger ▾</button>
+        <div class="menu-list" id="downloadMenu" hidden>
+          <button data-dl="png">Image (PNG)</button>
+          <button data-dl="table">Tableau agrégé (CSV)</button>
+          <button data-dl="raw">Données brutes filtrées (CSV)</button>
+        </div>
+      </div>
+      <a id="btnHelp" class="ghost btn-like" href="aide.html" target="_blank" rel="noopener" title="Guide d'utilisation (?)">? Aide</a>
+      <div class="menu">
+        <button id="btnUser" class="ghost user"><span class="avatar" id="userAvatar">?</span><span id="userName"></span> ▾</button>
+        <div class="menu-list" id="userMenu" hidden>
+          <div class="menu-info"><b id="userFull"></b><br><span id="userServer"></span></div>
+          <button id="btnCache">Cache des données…</button>
+          <button id="btnSwitch">Changer de serveur / compte</button>
+          <button id="btnLogout">Se déconnecter</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <section class="panel">
+        <h3>Source de données</h3>
+        <label><span id="projectLabel">Projet</span> <select id="project"></select></label>
+        <label><span id="formLabel">Formulaire</span> <select id="form"></select></label>
+        <label><span id="tableLabel">Table</span> <select id="table"></select></label>
+        <div class="row2">
+          <label><span id="fromLabel">Soumis du</span> <input type="date" id="from"></label>
+          <label>au <input type="date" id="to"></label>
+        </div>
+        <label id="reviewWrap">État de revue
+          <select id="reviewState">
+            <option value="">Toutes les soumissions</option>
+            <option value="null,approved,edited,hasIssues">Exclure les rejetées</option>
+            <option value="approved">Approuvées uniquement</option>
+          </select>
+        </label>
+        <div class="status"><span id="rowCount">—</span><span class="status-r"><span id="cacheState" class="cache-state"></span> <button id="btnRefresh" class="link" title="Ne charger que les soumissions nouvelles ou modifiées (Maj+clic : tout recharger)">↻ actualiser</button></span></div>
+      </section>
+      <section class="panel fields-panel">
+        <h3 class="with-btn">Champs <button id="btnCalc" class="link" title="Créer un champ calculé (formule)">+ ƒ champ calculé</button></h3>
+        <input id="fieldSearch" type="search" placeholder="Rechercher un champ">
+        <ul id="fieldList" class="field-list"></ul>
+        <p class="hint">Glissez un champ vers Colonnes, Lignes ou Filtre — ou cliquez dessus.</p>
+      </section>
+    </aside>
+
+    <main class="main">
+      <section class="layout">
+        <div class="zone-row"><span class="zone-label">Colonnes</span><div class="zone" data-zone="columns"></div></div>
+        <div class="zone-row"><span class="zone-label">Lignes</span><div class="zone" data-zone="rows"></div></div>
+        <div class="zone-row"><span class="zone-label">Filtre</span><div class="zone" data-zone="filters"></div></div>
+        <div class="zone-row measure">
+          <span class="zone-label">Valeur</span>
+          <div class="measure-ctl">
+            <select id="agg">
+              <option value="count">Nombre</option>
+              <option value="sum">Somme de</option>
+              <option value="avg">Moyenne de</option>
+              <option value="min">Minimum de</option>
+              <option value="max">Maximum de</option>
+              <option value="pct">% du total (nombre)</option>
+            </select>
+            <span id="measurePrefix" class="mprefix" hidden></span><select id="measureField"></select>
+            <span class="opts">
+              <label><input type="checkbox" id="optValues"> Afficher les valeurs</label>
+              <label>Libellés <select id="optLang"></select></label>
+              <label><input type="checkbox" id="optHideEmpty"> Masquer (vide)</label>
+              <label>Tri <select id="optSort"><option value="label">Libellé</option><option value="desc">Valeur ↓</option><option value="asc">Valeur ↑</option></select></label>
+              <label>Top <input type="number" id="optLimit" min="0" placeholder="tous"></label>
+              <label id="optTargetWrap" hidden>Cible <input type="number" id="optTarget" min="0" placeholder="auto"></label>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section class="canvas-wrap" id="canvasWrap">
+        <div class="canvas-tools">
+          <button id="btnFull" class="icon-btn" type="button" title="Plein écran (F)"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fs-on" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="fs-off" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg><span class="fs-label">Plein écran</span></button>
+        </div>
+        <input id="title" class="vis-title" placeholder="Visualisation sans titre">
+        <p id="visSub" class="vis-sub"></p>
+        <p id="visHint" class="vis-hint" hidden></p>
+        <div id="canvas" class="canvas"></div>
+        <div id="empty" class="empty"></div>
+      </section>
+    </main>
+  </div>
+  </div>
+
+  <div id="popover" class="popover" hidden></div>
+
+  <dialog id="openDialog">
+    <form method="dialog">
+      <h3>Ouvrir une visualisation</h3>
+      <input id="openSearch" type="search" placeholder="Rechercher">
+      <ul id="openList" class="open-list"></ul>
+      <div class="dialog-actions"><button value="cancel" class="ghost">Fermer</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="fmtDialog" class="wide"></dialog>
+  <dialog id="cacheDialog" class="wide"></dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="transforms.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

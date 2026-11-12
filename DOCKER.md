@@ -1,0 +1,118 @@
+# Déploiement Docker — Data Net Visualizer
+
+L'image contient tout ce qu'il faut (Node 20 + ECharts + Leaflet) : l'application fonctionne **sans accès Internet** côté navigateur (seuls les fonds de carte OpenStreetMap ont besoin d'Internet).
+
+## 1. Lancer
+
+```bash
+docker compose up -d --build
+docker compose ps            # doit afficher "healthy"
+docker compose logs -f       # journaux
+```
+
+Ouvrir `http://IP-DU-SERVEUR:3000`. L'écran de connexion demande la **plateforme** (ODK Central, IASO, CommCare, DHIS2 ou mSupply), l'**adresse du serveur**, l'**identifiant** et le **mot de passe** (ou la clé API pour CommCare, le jeton d'accès personnel pour DHIS2). Aucun identifiant n'est à mettre dans un fichier.
+
+Le conteneur doit pouvoir joindre les serveurs choisis par les utilisateurs en HTTPS sortant (par ex. `iaso.bluesquare.org`, `www.commcarehq.org`, votre DHIS2 ou votre serveur mSupply, avec son port).
+
+## 2. Réglages facultatifs
+
+Le fichier `.env` n'est pas obligatoire. Pour l'utiliser : `cp .env.example .env`, puis éditez-le.
+
+| Variable | Rôle |
+|---|---|
+| `PLATFORMS` | Plateformes proposées : `odk,iaso,commcare,dhis2,msupply` (défaut), ou une partie seulement |
+| `ODK_DEFAULT_URL` / `IASO_…` / `COMMCARE_…` / `DHIS2_…` / `MSUPPLY_DEFAULT_URL` | Serveur pré-rempli pour chaque plateforme |
+| `ODK_LOCK_URL=true` (idem `IASO_`, `COMMCARE_`, `DHIS2_`, `MSUPPLY_LOCK_URL`) | Impose ce serveur : l'utilisateur saisit seulement identifiant et mot de passe |
+| `ALLOWED_SERVERS` | Liste blanche de serveurs autorisés, toutes plateformes (séparés par des virgules) |
+| `ALLOW_DEMO=false` | Masque le bouton « données de démonstration » |
+| `HOST_PORT` | Port publié sur le serveur (défaut 3000) |
+| `CACHE_MINUTES` | Fraîcheur du cache (défaut 5 min) ; au-delà, mise à jour en arrière-plan |
+| `CACHE_PERSIST=false` | Cache en mémoire seulement (rien sur le disque) |
+| `CACHE_MEMORY_MB` / `CACHE_DISK_MB` | Taille max. du cache (256 / 2 048 Mo compressés) |
+
+Après modification : `docker compose up -d`.
+
+## 3. Sur le même serveur qu'ODK Central (recommandé)
+
+L'application peut joindre Central par le réseau Docker interne, sans passer par Internet :
+
+```bash
+docker network ls | grep central          # en général "central_default"
+docker compose -f docker-compose.yml -f docker-compose.central.yml up -d --build
+```
+
+Sur l'écran de connexion, utilisez alors l'adresse `http://service:8383`. Vous pouvez aussi la fixer pour tous les utilisateurs dans `.env` :
+
+```
+ODK_DEFAULT_URL=http://service:8383
+ODK_LOCK_URL=true
+```
+
+Si le réseau Docker porte un autre nom : `CENTRAL_NETWORK=nom_du_reseau docker compose -f docker-compose.yml -f docker-compose.central.yml up -d`.
+
+## 4. HTTPS (indispensable en production)
+
+Les mots de passe ODK transitent du navigateur vers l'application : placez-la derrière un reverse proxy HTTPS. Le cookie de session passe automatiquement en mode `Secure`. Exemple Caddy (certificat automatique) :
+
+```
+viz.monorg.org {
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+Exemple nginx :
+
+```nginx
+server {
+    server_name viz.monorg.org;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_read_timeout 300s;   # gros formulaires
+    }
+}
+```
+
+Dans ce cas, publiez le port uniquement en local : `HOST_PORT=127.0.0.1:3000` dans `.env`.
+
+## 5. Opérations courantes
+
+| Action | Commande |
+|---|---|
+| Mettre à jour après modification du code | `docker compose up -d --build` |
+| Redémarrer | `docker compose restart` |
+| Arrêter | `docker compose down` (les visualisations enregistrées sont conservées) |
+| Sauvegarder visualisations et champs transformés | `docker cp data-net-visualizer:/app/data/visualizations.json ./ && docker cp data-net-visualizer:/app/data/transforms.json ./` |
+| Restaurer | `docker cp ./visualizations.json data-net-visualizer:/app/data/ && docker cp ./transforms.json data-net-visualizer:/app/data/` |
+| Vider le cache des données | menu utilisateur → « Cache des données » → « Vider », ou `docker exec data-net-visualizer sh -c 'rm -f /app/data/cache/*'` puis `docker compose restart` |
+| Vérifier la santé | `curl http://localhost:3000/api/health` |
+
+## 6. Serveur sans Internet
+
+Construisez l'image sur une machine connectée, puis transférez-la :
+
+```bash
+docker save data-net-visualizer:latest | gzip > data-net-visualizer.tar.gz
+# sur le serveur :
+gunzip -c data-net-visualizer.tar.gz | docker load
+docker compose up -d --no-build
+```
+
+## Détails de l'image
+
+- Build en 2 étapes ; l'image finale n'a aucune dépendance npm.
+- Tourne avec l'utilisateur non-root `node`.
+- `HEALTHCHECK` intégré sur `/api/health`.
+- Sessions en mémoire : après un redémarrage du conteneur, les utilisateurs se reconnectent.
+- Volume `odkvis-data` monté sur `/app/data` : visualisations, champs transformés et cache des données (`/app/data/cache`, conservé aux redémarrages).
+- Arrêt propre sur `SIGTERM`, rotation des journaux (3 × 10 Mo).
+
+## Mise à jour depuis ODK Visualizer
+
+L'application s'appelle désormais **Data Net Visualizer** : l'image est `data-net-visualizer:latest`, le service et le conteneur `data-net-visualizer`. Le volume `odkvis-data` garde son nom : vos visualisations enregistrées et vos champs transformés sont conservés. Après `docker compose up -d --build`, pensez à :
+
+- supprimer l'ancien conteneur s'il tourne encore : `docker rm -f odk-visualizer` ;
+- remplacer `odk-visualizer:3000` par `data-net-visualizer:3000` dans la configuration nginx du reverse proxy (`proxy_pass`), puis recharger nginx ;
+- les utilisateurs devront se reconnecter (nouveau nom de cookie).

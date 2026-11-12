@@ -1,0 +1,23 @@
+services:
+  data-net-visualizer:
+    build: .
+    image: data-net-visualizer:latest
+    container_name: data-net-visualizer
+    restart: unless-stopped
+    init: true
+    env_file:                 # facultatif : réglages (aucun identifiant n'y est nécessaire)
+      - path: .env
+        required: false
+    environment:
+      PORT: 3000
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    volumes:
+      # the volume keeps its historical name so that saved visualizations survive the rename to Data Net Visualizer
+      - odkvis-data:/app/data  # saved visualizations, transformations, cache
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  odkvis-data:
